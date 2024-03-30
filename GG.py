@@ -1,105 +1,98 @@
 class GG:
     """ Gaussian integer x+iy """
-    def __init__(self, x=0, y=0):
-        self.x = int(x)
-        self.y = int(y)
+    def __init__(a, x=0, y=0):
+        a.x = int(x)
+        a.y = int(y)
 
-    def __repr__(self):
-        if self.y == 0: return str(self.x)
-        elif self.x == 0: return str(self.y) + 'j'
-        elif self.y < 0:
-            return '(' + str(self.x) + str(self.y) + 'j)'
+    def __repr__(a):
+        if a.y == 0: return str(a.x)
+        elif a.x == 0: return str(a.y) + 'j'
+        elif a.y < 0:
+            return '(' + str(a.x) + str(a.y) + 'j)'
         else:
-            return '(' + str(self.x) + '+' + str(self.y) + 'j)'
+            return '(' + str(a.x) + '+' + str(a.y) + 'j)'
 
-    def __hash__(self):
-        return self.x ^ self.y
+    def __hash__(a):
+        return a.x ^ a.y
 
-    def __neg__(self):
-        return GG(-self.x, -self.y)
+    def __neg__(a):
+        return GG(-a.x, -a.y)
 
-    def __add__(self, a):
-        if isinstance(a, GG):
-            return GG(self.x + a.x, self.y + a.y)
+    def __add__(a,b):
+        if isinstance(b, GG):
+            return GG(a.x + b.x, a.y + b.y)
         else:
-            return GG(self.x + a, self.y)
+            return GG(a.x + b, a.y)
 
-    def __sub__(self, a):
-        if isinstance(a, GG):
-            return GG(self.x - a.x, self.y - a.y)
+    def __sub__(a,b):
+        if isinstance(b, GG):
+            return GG(a.x - b.x, a.y - b.y)
         else:
-            return GG(self.x - a, self.y)
+            return GG(a.x - b, a.y)
 
-    def __mul__(self, a):
-        if isinstance(a, GG):
-            s = self.x*a.x
-            t = self.y*a.y
-            u = (self.x - self.y)*(a.y - a.x)
+    def __mul__(a,b):
+        if isinstance(b, GG):
+            s = a.x*b.x
+            t = a.y*b.y
+            u = (a.x - a.y)*(b.y - b.x)
             return GG(s-t, s+t+u)
         else:
-            return GG(a*self.x, a*self.y)
+            return GG(b*a.x, b*a.y)
 
-    def __truediv__(self, a):
-        """ self = aq + r, norm(r) <= norm(a)/2 """
-        if isinstance(a, GG):
-            self *= conj(a)
-            a = norm(a)
-        elif a<0: self,a = -self,-a
-        x,r = divmod(self.x, a)
-        y,s = divmod(self.y, a)
-        a2 = a//2
-        if r > a2: x += 1
-        if s > a2: y += 1
+    def __truediv__(a,b):
+        """ a = bq + r, norm(r) <= norm(b)/2 """
+        if isinstance(b, GG):
+            a *= conj(b)
+            b = norm(b)
+
+        x = ((a.x<<1) + b)//(b<<1)
+        y = ((a.y<<1) + b)//(b<<1)
         return GG(x,y)
 
-    def __mod__(self, a):
-        q = self/a
-        return self - a*q
+    def __mod__(a,b):
+        return a - a/b*b
 
-    def __divmod__(self, a):
-        q = self/a
-        return q, self - a*q
+    def __divmod__(a,b):
+        q = a/b
+        return q, a - b*q
 
-    def __pow__(self, e):
+    def __pow__(a,e):
         """ assume e>=0 """
         if e==0: return GG(1)
         n = (1<<(e.bit_length()-1))>>1
-        a = self
+        b = a
         while n:
-            a *= a
-            if e&n: a *= self
+            b *= b
+            if e&n: b *= a
             n>>=1
-        return a
+        return b
 
-    def __eq__(self, a):
-        if isinstance(a, GG):
-            return self.x == a.x and self.y == a.y
+    def __eq__(a,b):
+        if isinstance(b, GG):
+            return a.x == b.x and a.y == b.y
         else:
-            return self.x == a and self.y == 0
+            return a.x == b and a.y == 0
 
-    def __ne__(self, a):
-        return not self.__eq__(a)
+    def __radd__(a,b):
+        return GG(b + a.x, a.y)
 
-    def __radd__(self, a):
-        return GG(a + self.x, self.y)
+    def __rsub__(a,b):
+        return GG(b - a.x, -a.y)
 
-    def __rsub__(self, a):
-        return GG(a - self.x, -self.y)
+    def __rmul__(a,b):
+        return GG(b*a.x, b*a.y)
 
-    def __rmul__(self, a):
-        return GG(a*self.x, a*self.y)
+    def __rtruediv__(a,b):
+        return GG(b).__truediv__(a)
 
-    def __rtruediv__(self, a):
-        return GG(a).__truediv__(self)
+    def __rmod__(a,b):
+        return GG(b).__mod__(a)
 
-    def __rmod__(self, a):
-        return GG(a).__mod__(self)
+    def __rdivmod__(a,b):
+        return GG(b).__divmod__(a)
 
-    def __rdivmod__(self, a):
-        return GG(a).__divmod__(self)
-
-    def __complex__(self):
-        return complex(self.x, self.y)
+    def __complex__(a):
+        return complex(a.x, a.y)
 
 def real(a): return a.x
 def imag(a): return a.y
@@ -192,8 +185,18 @@ def XGCD(a,b):
 
 #########################################################
 from sympy import sqrt_mod, factorint, randprime, isprime
-from fractions import gcd
+from math import gcd
 from random import randrange
+
+def primary(a):
+    """ return a*unit = x+yi such that x is odd and
+      y is even and a+b==1 (mod 4).
+    assume norm(a) is odd
+    """
+    x,y = a.x&3, a.y&3
+    if x+y==3: a = -a
+    if y&1: return div_i(a)
+    else: return a
 
 def SqrRoot(n):
     """ floor(sqrt(n)) for huge integer n """
@@ -201,29 +204,30 @@ def SqrRoot(n):
     while x>y: x,y = y, (y + n//y)//2
     return x
 
-def cornacchia(p):
+def FactorPrime(p):
     """ given a prime number p where p==1 (mod 4),
     find x,y such that x*x + y*y = p and x>y>0
-    by cornacchia algorithm
+      by cornacchia algorithm
+    and return primary(x+yi)
     referece: H. Wada
       "Prime Factorization by Computers" (in Japanese) p69
     """
     x,y = p, sqrt_mod(p-1, p)
     s = SqrRoot(p)
     while x>s: x,y = y,x%y
-    return x,y
+    return primary(GG(x,y))
 
 def factor(a):
     """ factorize a into gaussian primes
     return dictionary of (prime, exponent) pair
     such that product of p**e is associate of a
     real factors are positive and
-    imaginary factors are in first quadrant
+    imaginary factors are primary
     """
     if not isinstance(a,GG): a = GG(a)
     f = {}
     if a==0 or IsUnit(a): return f
-    d = abs(gcd(real(a), imag(a)))
+    d = gcd(real(a), imag(a))
     if d>1: a /= d
     g = factorint(norm(a))
     h = factorint(d)
@@ -233,16 +237,15 @@ def factor(a):
     for k in h:
         if k&3 == 3: f[k] = h[k]
         else:
-            x,y = cornacchia(k)
-            p,q = GG(x,y),GG(y,x)
+            p = FactorPrime(k)
+            q = conj(p)
             f[p],f[q] = h[k],h[k]
             if k in g:
                 if a%p == 0: f[p] += g.pop(k)
                 else:        f[q] += g.pop(k)
     for k in g:
-        x,y = cornacchia(k)
-        p = GG(x,y)
-        if a%p != 0: p = GG(y,x)
+        p = FactorPrime(k)
+        if a%p != 0: p = conj(p)
         f[p] = g[k]
 
     return f
@@ -257,16 +260,18 @@ def IsPrime(a):
     b = norm(a)
     return b==2 or (b&3 == 1 and isprime(b))
 
-def GenPrime(l):
+def GenPrime(l, f=1):
     """ generate random gaussian prime p
-    such that bit length of norm(p) is l and
-    p is in first quadrant Re(p)>0 and Im(p)>0
-    assume l>=2
+    such that norm(p) == q^f (f=1,2) where
+    q is prime number, bit length of q is l
+    and p is primary; assume l>=2
     """
     while True:
         p = randprime(1<<(l-1), 1<<l)
-        if p == 2: return GG(1,1)
-        if p%4 == 1:
-            x,y = cornacchia(p)
-            if randrange(2): return GG(x,y)
-            else:            return GG(y,x)
+        if f <= 1:
+            if p == 2: return GG(1,1)
+            if p&3 == 1:
+                p = FactorPrime(p)
+                if randrange(2): return p
+                else: return conj(p)
+        elif p&3 == 3: return p
