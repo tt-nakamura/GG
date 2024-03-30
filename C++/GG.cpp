@@ -1,32 +1,38 @@
+// uses NTL
+//   http://www.shoup.net/ntl
+
 #include "GG.h"
+using namespace NTL;
 
-GG& GG::operator=(const GG& a) { x=a.x; y=a.y; return *this; }
-GG& GG::operator=(const ZZ& a) { x=a; clear(y); return *this; }
-GG& GG::operator=(long a) { x=a; clear(y); return *this; }
+GG& GG::operator=(const ZZ& a)
+{ x=a; clear(y); return *this; }// a+0i
 
-const GG& operator+=(GG& a, const GG& b) {// a+=b
+GG& GG::operator=(long a)
+{ x=a; clear(y); return *this; }// a+i0
+
+GG& operator+=(GG& a, const GG& b) {// a+=b
     a.x += b.x;
     a.y += b.y;
     return a;
 }
 
-const GG& operator-=(GG& a, const GG& b) {// a-=b
+GG& operator-=(GG& a, const GG& b) {// a-=b
     a.x -= b.x;
     a.y -= b.y;
     return a;
 }
 
-const GG& operator*=(GG& a, const GG& b) {// a*=b
+GG& operator*=(GG& a, const GG& b) {// a*=b
     mul(a,a,b);
     return a;
 }
 
-const GG& operator/=(GG& a, const GG& b) {// a/=b
+GG& operator/=(GG& a, const GG& b) {// a/=b
     div(a,a,b);
     return a;
 }
 
-const GG& operator%=(GG& a, const GG& b) {// a%=b
+GG& operator%=(GG& a, const GG& b) {// a%=b
     rem(a,a,b);
     return a;
 }
@@ -90,21 +96,21 @@ void mul_i(GG& b, const GG& a, long e) {// b = a * i^e
 
 long quadrant(const GG& a)
 // return -1 if a==0
-//        0 if real(a)>0 and imag(a)>=0
-//        1 if real(a)<=0 and imag(a)>0
-//        2 if real(a)<0 and imag(a)<=0
-//        3 if real(a)>=0 and imag(a)<0
+//         0 if real(a)>0 and imag(a)>=0
+//         1 if real(a)<=0 and imag(a)>0
+//         2 if real(a)<0 and imag(a)<=0
+//         3 if real(a)>=0 and imag(a)<0
 {
     if(IsZero(a.x)) {
         if(IsZero(a.y)) return -1;
-        else if(a.y>0) return 1;
+        else if(sign(a.y) > 0) return 1;
         else return 3;
     }
-    else if(a.x>0) {
-        if(a.y<0) return 3;
+    else if(sign(a.x) > 0) {
+        if(sign(a.y) < 0) return 3;
         else return 0;
     }
-    else if(a.y>0) return 1;
+    else if(sign(a.y) > 0) return 1;
     else return 2;
 }
 
@@ -117,6 +123,21 @@ long FirstQuad(GG& b, const GG& a)
     mul_i(b,a,c);
     return c;
 }
+
+void primary(GG& b, const GG& a)
+// b = a*unit == x+yi to make
+//   x odd and y even and x+y==1 (mod 4)
+// assume norm(a) != 0 (mod 2)
+{
+    long x(a.x%4), y(a.y%4);
+    if(y&1) {
+        div_i(b,a);
+        if(x+y == 3) negate(b,b);
+    }
+    else if(x+y == 3) negate(b,a);
+    else if(&b!=&a) b=a;
+}
+
 
 void add(GG& c, const GG& a, const GG& b) {// c=a+b
     add(c.x, a.x, b.x);
@@ -142,27 +163,37 @@ void mul(GG& c, const GG& a, const GG& b) {// c=a*b
 
 void sqr(GG& b, const GG& a) {// b=a*a
     ZZ s,t;
-    mul(s, a.x, a.y);
-    sqr(t, a.y);
-    LeftShift(b.y, s, 1);
-    sqr(s, a.x);
-    sub(b.x, s, t);
+    add(s, a.x, a.y);
+    sub(t, a.x, a.y);
+    mul(b.y, a.x, a.y);
+    mul(b.x, s, t);
+    b.y <<= 1;
 }
 
 void div(GG& q, const GG& a, const GG& b)
 // q = quotient of a/b such that
 //   a = bq + r and |r/b|^2 <= 1/2
 {
-    ZZ r,s,t;
+    ZZ n;
     GG c;
-    norm(s,b);
-    RightShift(t,s,1);
-    conj(c,b);
-    c *= a;
-    DivRem(q.x, r, c.x, s);
-    if(r>t) q.x++;
-    DivRem(q.y, r, c.y, s);
-    if(r>t) q.y++;
+    if(IsZero(b.y)) {
+        n = b.x;
+        c = a;
+    }
+    else if(IsZero(b.x)) {
+        n = b.y;
+        div_i(c,a);
+    }
+    else {
+        norm(n,b);
+        conj(c,b);
+        c *= a;
+    }
+    c.x <<= 1; c.x += n;
+    c.y <<= 1; c.y += n;
+    n <<= 1;
+    div(q.x, c.x, n);
+    div(q.y, c.y, n);
 }
 
 void rem(GG& r, const GG& a, const GG& b)
@@ -196,23 +227,40 @@ long divide(GG& q, const GG& a, const GG& b)
 // if a/b is divisible, set q=a/b and return 1
 // else return 0
 {
-    ZZ s;
+    ZZ n;
     GG c;
-    norm(s,b);
-    conj(c,b);
-    c *= a;
-    return divide(q.x, c.x, s) && divide(q.y, c.y, s);
+    if(IsZero(b.y)) {
+        n = b.x;
+        c = a;
+    }
+    else if(IsZero(b.x)) {
+        n = b.y;
+        div_i(c,a);
+    }
+    else {
+        norm(n,b);
+        conj(c,b);
+        c *= a;
+    }
+    if(!divide(c.x, c.x, n) ||
+       !divide(q.y, c.y, n)) return 0;
+    q.x = c.x;
+    return 1;
 }
 
 long divide(const GG& a, const GG& b)
 // if a/b is divisible, return 1, else return 0
 {
-    ZZ s;
+    ZZ n;
     GG c;
-    norm(s,b);
+    if(IsZero(b.y))
+        return divide(a.x, b.x) && divide(a.y, b.x);
+    if(IsZero(b.x))
+        return divide(a.x, b.y) && divide(a.y, b.y);
+    norm(n,b);
     conj(c,b);
     c *= a;
-    return divide(c.x, s) && divide(c.y, s);
+    return divide(c.x, n) && divide(c.y, n);
 }
 
 void power(GG& b, const GG& a, long n)
@@ -244,21 +292,20 @@ long IsAssoc(const GG& a, const GG& b)
     return 0;
 }
 
-long ProbPrime(const GG& a)
-// return 1 if either
+long ProbPrime(const GG& a, long NTRY)
+// test if a is gaussian prime, i.e.,
 //   |a|^2 is prime and |a|^2==1 (mod 4) or
-//   Im(b)==0 and |Re(a)| is prime and |Re(a)|==3 (mod 4) or
-//   Re(b)==0 and |Im(a)| is prime and |Im(a)|==3 (mod 4)
-// else return 0
-// primality is tested probabilistically by Miller-Rabin method
+//   Im(a)==0 and |Re(a)| is prime and |Re(a)|==3 (mod 4) or
+//   Re(a)==0 and |Im(a)| is prime and |Im(a)|==3 (mod 4)
+// NTRY: number of trials of Miller-Rabin test
 {
     ZZ b;
     if(IsZero(a.y)) abs(b, a.x);
     else if(IsZero(a.x)) abs(b, a.y);
     if(!IsZero(b))
-        return trunc_long(b,2)==3 && ProbPrime(b);
+        return trunc_long(b,2)==3 && ProbPrime(b, NTRY);
     norm(b,a);
-    return b==2 || trunc_long(b,2)==1 && ProbPrime(b);
+    return b==2 || trunc_long(b,2)==1 && ProbPrime(b, NTRY);
 }
 
 void GCD(GG& d, const GG& a, const GG& b)
@@ -305,52 +352,38 @@ void XGCD(GG& d, GG& s, GG& t, const GG& a, const GG& b)
 
 void RandomBnd(GG& a, const ZZ& n)
 // a = random gaussian integer such that
-//   0<=Re(a)<n and 0<=Im(a)<n
+//   |Re(a)|<n and |Im(a)|<n
 {
     RandomBnd(a.x, n);
     RandomBnd(a.y, n);
+    mul_i(a, a, RandomBits_long(2));
 }
 
-void RandomBits(GG& a, long l)
-// a = random gaussian integer such that
-//   0<=Re(a)<2^l and 0<=Im(a)<2^l
-{
-    RandomBits(a.x, l);
-    RandomBits(a.y, l);
-}
-
-void RandomLen(GG& a, long l)
-// a = random gaussian integer such that
-//   2^{l-1}<=Re(a)<2^l and 2^{l-1}<=Im(a)<2^l
-{
-    RandomLen(a.x, l);
-    RandomLen(a.y, l);
-}
-
-void GenPrime(GG& p, long l, long err)
-// generate gaussian prime
-// p = gaussian integer such that |p|^2 is prime
-//   and |p|^2 == 1 (mod 4) and 2^{l-1} < |p|^2 < 2^l
-// probability of error is less than 2^-err
+void GenPrime(GG& p, long l, long f, long err)
+// generate random gaussian prime.
+// p = gaussian integer such that |p|^2 == q^f
+//   where q is random prime integer
+// l = bit length of q, so that 2^{l-1} < q < 2^l
+// f = 1 or 2 (P == 1 or 3 mod 4, respectively).
+//   If f==1, p is imaginary, Re(p)>0, Im(p)>0.
+//   If f==2, p = q (real and positive).
+// err = bound for error probability < 2^{-err}
+// If f<1 or f>2, f is set to 1 or 2, respectively.
 {
     if(l<2) Error("l<2 in GenPrime");
     ZZ q;
-    do GenPrime(q,l,err);
-    while(trunc_long(q,2)==3);
-    if(q==2) { set(p,1,1); return; }
-    cornacchia(p.x, p.y, q);
-    if(RandomBits_long(1)) swap(p.x, p.y);
-}
-
-void GenRealPrime(GG& p, long l, long err)
-// p = gaussian integer such that Im(p)=0 and Re(p) is prime
-//   and Re(p) == 3 (mod 4) and 2^{l-1} < Re(p) < 2^l
-// probability of error is less than 2^-err
-{
-    if(l<2) Error("l<2 in GenPrime");
-    clear(p.y);
-    do GenPrime(p.x, l, err);
-    while(trunc_long(p.x, 2)!=3);
+    if(f<=1) {
+        do GenPrime(q,l,err);
+        while(trunc_long(q,2)==3);
+        if(q==2) { set(p,1,1); return; }
+        FactorPrime(p,q);
+        if(RandomBits_long(1)) conj(p,p);
+    }
+    else {
+        do GenPrime(p.x, l, err);
+        while(trunc_long(p.x, 2)!=3);
+        clear(p.y);        
+    }
 }
 
 std::ostream& operator<<(std::ostream& s, const GG& a) {

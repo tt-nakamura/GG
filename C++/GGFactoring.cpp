@@ -1,4 +1,8 @@
+// uses NTL
+//   http://www.shoup.net/ntl
+
 #include "GGFactoring.h"
+using namespace NTL;
 
 void cornacchia(ZZ& x, ZZ& y, const ZZ& p)
 // given a prime number p where p==1 (mod 4),
