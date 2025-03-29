@@ -1,2 +1,2 @@
 # GG
-Gaussian integer x+iy and its prime factorization
+biquadratic reciprocity on Gaussian integers

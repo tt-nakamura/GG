@@ -56,15 +56,15 @@ class GG:
         q = a/b
         return q, a - b*q
 
-    def __pow__(a,e):
-        """ assume e>=0 """
-        if e==0: return GG(1)
-        n = (1<<(e.bit_length()-1))>>1
+    def __pow__(a,n):
+        """ assume n>=0 """
+        if n==0: return GG(1)
+        k = (1<<(n.bit_length()-1))>>1
         b = a
-        while n:
+        while k:
             b *= b
-            if e&n: b *= a
-            n>>=1
+            if n&k: b *= a
+            k>>=1
         return b
 
     def __eq__(a,b):
@@ -94,44 +94,47 @@ class GG:
     def __complex__(a):
         return complex(a.x, a.y)
 
+    def isUnit(a):
+        return (a.y==0 and abs(a.x)==1) or\
+               (a.x==0 and abs(a.y)==1)
+
 def real(a): return a.x
 def imag(a): return a.y
 def norm(a): return a.x**2 + a.y**2
-
 def conj(a): return GG(a.x, -a.y)
-def IsUnit(a): return (a.y==0 and abs(a.x)==1)\
-                   or (a.x==0 and abs(a.y)==1)
 def mul_i(a): return GG(-a.y, a.x) # a*i
 def div_i(a): return GG(a.y, -a.x) # a/i
 
 def IsAssoc(a, b, exponent=False):
-    """ test if a == b*i^e for some e (e=0,1,2,3)
+    """ a,b: GG, return int
+    test if a == b*i^k for some k (k=0,1,2,3)
     if exponent is False, return True or False
-    else if a is associate of b, return e
+    else if a is associate of b, return k
     else return -1
     """
-    if   a == b: e=0
-    elif a == -b: e=2
-    elif a == mul_i(b): e=1
-    elif a == div_i(b): e=3
-    else: e=-1
-    if exponent: return e
-    else: return e>=0
+    if   a == b: k=0
+    elif a == -b: k=2
+    elif a == mul_i(b): k=1
+    elif a == div_i(b): k=3
+    else: k=-1
+    if exponent: return k
+    else: return k>=0
 
-def mul_ipow(a,e):
-    """ a*i^e """
-    e &= 3
-    if   e==2: return -a
-    elif e==1: return mul_i(a)
-    elif e==3: return div_i(a)
+def mul_ipow(a,k): # a*i^k
+    """ a: GG, k: int, return GG """
+    k &= 3
+    if   k==2: return -a
+    elif k==1: return mul_i(a)
+    elif k==3: return div_i(a)
     else: return a
 
 def quadrant(a):
-    """ return -1 if a==0,
-    0 if Re(a)>0 and Im(a)>=0,
-    1 if Re(a)<=0 and Im(a)>0,
-    2 if Re(a)<0 and Im(a)<=0,
-    3 if Re(a)>=0 and Im(a)<0
+    """ a: GG, return int
+    return -1 if a==0,
+            0 if Re(a)>0 and Im(a)>=0,
+            1 if Re(a)<=0 and Im(a)>0,
+            2 if Re(a)<0 and Im(a)<=0,
+            3 if Re(a)>=0 and Im(a)<0
     """
     if a.x==0:
         if a.y==0: return -1
@@ -144,30 +147,34 @@ def quadrant(a):
     else: return 2
 
 def FirstQuad(a, exponent=False):
-    """ return b = a*i^e for some e (e=0,1,2,3)
+    """ a: GG, return GG
+    return b = a*i^k for some k (k=0,1,2,3)
     in first quadrant Re(b)>0 and Im(b)>=0
-    if exponent is True, return b and e
-    if a is zero, then b=0 and e=0
+    if exponent is True, return b and k
+    if a is zero, then b=0 and k=0
     """
-    e = quadrant(a)
-    e = 4-e if e>0 else 0
-    b = mul_ipow(a,e)
-    if exponent: return b,e
+    k = quadrant(a)
+    k = 4-k if k>0 else 0
+    b = mul_ipow(a,k)
+    if exponent: return b,k
     else: return b
 
 def GCD(a,b):
-    """ d = greatest common divisor of a and b
-    in first quadrant Re(d)>0 and Im(d)>=0
-    by Euclidean algorithm
+    """ a,b: GG, return GG
+    d = greatest common divisor of a and b
+      in first quadrant Re(d)>0 and Im(d)>=0
+      by Euclidean algorithm
+    return d
     if a and b are both zero, then d=0
     """
     while b!=0: a,b = b,a%b
     return FirstQuad(a)
 
 def XGCD(a,b):
-    """ d = greatest common divisor of a and b
-    in first quadrant Re(d)>0 and Im(d)>=0
-    by extended Euclidean algorithm
+    """ a,b: GG, return GG*3
+    d = greatest common divisor of a and b
+      in first quadrant Re(d)>0 and Im(d)>=0
+      by extended Euclidean algorithm
     return d,s,t such that d = s*a + t*b
     if a and b are both zero, then d,s,t=0,1,0
     """
@@ -183,42 +190,90 @@ def XGCD(a,b):
     t = mul_ipow(t,e)
     return d,s,t
 
+def primary(a, exponent=False):
+    """ a: GG, return GG
+    return b=x+iy such that a = b*i^k (k=0,1,2,3)
+      and x is odd and y is even and x+y==1 (mod 4).
+    assume norm(a) is odd
+    if exponent is True, return b and k
+    """
+    x,y = a.x&3, a.y&3
+    if x+y==3: a,k = -a,2
+    else: k = 0
+    if y&1: a,k = div_i(a), k+1
+    if exponent: return a,k
+    else: return a
+
+def ResSymb(a,b):
+    """a,b: GG, return GG
+    return biquadratic residue symbol (a/b)_4 = 0,1,i,-1,-i
+    Assume norm(a) < norm(b) and norm(b) is odd
+    Assume b is primary, but may not be prime
+    reference: K. S. Williams
+      "On the Supplement to the Law of Biquadratic Reciprocity"
+      Proceedings of the American Mathematical Society 59 (1976) 19
+    """
+    j,lam = 0, GG(1,1)
+    while a!=0:
+        m = (((b.x - b.y)>>2) - ((b.y>>1)&1))&3
+        n = (b.x>>1)&3
+        while True:
+            q,r = divmod(a,lam)
+            if r!=0: break
+            a,j = q, j+m
+
+        a,k = primary(a, True)
+        if a.y&2 and b.y&2: j += 2
+        a,b,j = b%a, a, (j-k*n)&3
+
+    if not b.isUnit(): return 0
+    elif j==0: return GG(1)
+    elif j==1: return GG(0,1)
+    elif j==2: return GG(-1)
+    else: return GG(0,-1)
+
+def PowerMod(a,n,m): # a^n mod m
+    """ a,m: GG, n: int, return GG
+    assume n>=0 """
+    if n==0: return GG(1)
+    k = (1<<(n.bit_length()-1))>>1
+    b = a
+    while k:
+        b = b*b%m
+        if n&k: b = b*a%m
+        k>>=1
+    return b
+
 #########################################################
-from sympy import sqrt_mod, factorint, randprime, isprime
+import sympy as sp
+from sympy.abc import x
 from math import gcd
 from random import randrange
 
-def primary(a):
-    """ return a*unit = x+yi such that x is odd and
-      y is even and a+b==1 (mod 4).
-    assume norm(a) is odd
-    """
-    x,y = a.x&3, a.y&3
-    if x+y==3: a = -a
-    if y&1: return div_i(a)
-    else: return a
-
-def SqrRoot(n):
-    """ floor(sqrt(n)) for huge integer n """
+def SqrRoot(n): # floor(sqrt(n))
+    """ n: int, return int """
     x,y = n+1,n
     while x>y: x,y = y, (y + n//y)//2
     return x
 
 def FactorPrime(p):
-    """ given a prime number p where p==1 (mod 4),
-    find x,y such that x*x + y*y = p and x>y>0
-      by cornacchia algorithm
-    and return primary(x+yi)
+    """ p: int, return GG
+    given prime number p,
+    find x,y such that x*x + y*y = p and
+      x odd, y even, x+y==1 (mod 4)
+    return primary(x+yi)
+    Assume p==1 (mod 4)
     referece: H. Wada
       "Prime Factorization by Computers" (in Japanese) p69
     """
-    x,y = p, sqrt_mod(p-1, p)
+    x,y = p, sp.sqrt_mod(p-1, p)
     s = SqrRoot(p)
     while x>s: x,y = y,x%y
     return primary(GG(x,y))
 
 def factor(a):
-    """ factorize a into gaussian primes
+    """ a: GG, return dict{GG,int}
+    factorize a into gaussian primes
     return dictionary of (prime, exponent) pair
     such that product of p**e is associate of a
     real factors are positive and
@@ -226,11 +281,11 @@ def factor(a):
     """
     if not isinstance(a,GG): a = GG(a)
     f = {}
-    if a==0 or IsUnit(a): return f
+    if a==0 or a.isUnit(): return f
     d = gcd(real(a), imag(a))
     if d>1: a /= d
-    g = factorint(norm(a))
-    h = factorint(d)
+    g = sp.factorint(norm(a))
+    h = sp.factorint(d)
 
     k = g.pop(2,0) + 2*h.pop(2,0)
     if k: f[GG(1,1)] = k
@@ -251,27 +306,55 @@ def factor(a):
     return f
 
 def IsPrime(a):
-    """ test if a is gaussian prime """
+    """ a: GG, return bool
+    test if a is gaussian prime """
     if not isinstance(a,GG): a = GG(a)
     if   imag(a)==0: b = abs(real(a))
     elif real(a)==0: b = abs(imag(a))
     else: b = -1
-    if b>=0: return b&3 == 3 and isprime(b)
+    if b>=0: return b&3 == 3 and sp.isprime(b)
     b = norm(a)
-    return b==2 or (b&3 == 1 and isprime(b))
+    return b==2 or (b&3 == 1 and sp.isprime(b))
 
 def GenPrime(l, f=1):
-    """ generate random gaussian prime p
-    such that norm(p) == q^f (f=1,2) where
-    q is prime number, bit length of q is l
-    and p is primary; assume l>=2
+    """ l,f: int, return GG
+    generate random gaussian prime p
+    Assume f=1 or 2; Assume l>=2
+    if f=1, |p|^2=q and q==1 (mod 4)
+    if f=2, p=-q+0i and q==3 (mod 4)
+    where q is random prime and 2^{l-1} <= q < 2^l
+    p=x+iy is primary (x odd, y even, x+y==1 (mod 4))
     """
     while True:
-        p = randprime(1<<(l-1), 1<<l)
+        p = sp.randprime(1<<(l-1), 1<<l)
         if f <= 1:
             if p == 2: return GG(1,1)
             if p&3 == 1:
                 p = FactorPrime(p)
                 if randrange(2): return p
                 else: return conj(p)
-        elif p&3 == 3: return p
+
+        elif p&3 == 3: return GG(-p)
+
+def InvMod(a,p):
+    """ a,p: int, return int
+    return x such that ax==1 (mod p)
+    Assume a and p are relatively prime
+    """
+    s,u = 1,0
+    while p:
+        q,r = divmod(a,p)
+        a,p,s,u = p,r,u,s-q*u
+    return s
+
+def QrtRootMod(a,p):
+    """ a,p: GG, return GG
+    solve x^4 == a (mod p) and return x
+    Assume norm(p) is prime and norm(p)==1 (mod 4)
+    Assume (a/p)_4 == 1
+    """
+    n = norm(p)
+    b = p.x * InvMod(p.y, n) % n
+    b = (a.x - b * a.y % n) % n
+    F = sp.factor_list(x**4 - b, modulus=n)
+    return int(-F[1][0][0].coeff(x,0))%p
