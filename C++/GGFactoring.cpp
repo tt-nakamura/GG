@@ -4,14 +4,15 @@
 #include "GGFactoring.h"
 using namespace NTL;
 
-void cornacchia(ZZ& x, ZZ& y, const ZZ& p)
+void FactorPrime(GG& f, const ZZ& p)
 // given a prime number p where p==1 (mod 4),
-// find x,y such that x^2 + y^2 = p and x>y>0
-// by cornacchia algorithm
+// find x,y such that x^2 + y^2 = p and
+//   x odd, y even, x+y==1(mod 4)
+// return f = x+iy
 // reference: H. Wada
 //   "Prime Factorization by Computers" (in Japanese) p69
 {
-    ZZ s,r;
+    ZZ s,r, &x(f.x), &y(f.y);
     SqrRoot(s,p);
     sub(r,x=p,1);
     SqrRootMod(y,r,p);
@@ -20,6 +21,7 @@ void cornacchia(ZZ& x, ZZ& y, const ZZ& p)
         x=y;
         y=r;
     }
+    primary(f,f);
 }
 
 void factor(Vec<Pair<GG, long> >& f, const GG& a)
@@ -63,15 +65,13 @@ void factor(Vec<Pair<GG, long> >& f, const GG& a)
     while(i<g.length() || j<h.length()) {// imaginary factor
         if(j==h.length() || i<g.length() && g[i].a < h[j].a) {
             f.SetLength(k+1);
-            cornacchia(s, t, g[i].a);
-            set(f[k].a, s, t);
+            FactorPrime(f[k].a, g[i].a);
             if(!divide(b, f[k].a)) mirror(f[k].a, f[k].a);
             f[k++].b = g[i++].b;
         }
         else {
             f.SetLength(k+2);
-            cornacchia(s, t, h[j].a);
-            set(f[k].a, s, t);
+            FactorPrime(f[k].a, h[j].a);
             mirror(f[k+1].a, f[k].a);
             f[k+1].b = f[k].b = h[j].b;
             if(i<g.length() && g[i].a == h[j].a) {

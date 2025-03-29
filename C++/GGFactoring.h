@@ -4,7 +4,7 @@
 #ifndef __GGFactoring_h__
 #define __GGFactoring_h__
 
-#include<NTL/pair.h>
+#include<NTL/Pair.h>
 #include "GG.h"
 
 void factor(NTL::Vec<NTL::Pair<NTL::ZZ, long> >& f, const NTL::ZZ& n);
@@ -20,6 +20,10 @@ void factor(NTL::Vec<NTL::Pair<GG, long> >& f, const GG& a);
 // imaginary factors are appended after real factors
 // real factors are positive and sorted in increasing order
 // imaginary factors are in first quadrant and sorted by norm
+
+void mul(NTL::ZZ& a, const NTL::Vec<NTL::Pair<NTL::ZZ, long> >& f);
+// a = product of (integer)^{exponent} in f
+// each element of f is a pair of integer and exponent
 
 void mul(GG& a, const NTL::Vec<NTL::Pair<GG, long> >& f);
 // a = product of (gaussian integer)^{exponent} in f
